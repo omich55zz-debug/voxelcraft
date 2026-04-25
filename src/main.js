@@ -45,3 +45,6 @@ addEventListener('keydown', (e) => {
 
 // Initial menu state.
 menu.show(false);
+
+// Debug: expose game to window for console inspection.
+window.__voxel = { game, hud, menu };

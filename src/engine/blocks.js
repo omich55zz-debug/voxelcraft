@@ -25,6 +25,18 @@ export const BLOCK = {
   COAL: 18,
   BEDROCK: 19,
   SNOW: 20,
+  // Magic-dimension blocks
+  OBSIDIAN: 21,
+  ENDER_STONE: 22,
+  MAGIC_CRYSTAL: 23,
+  GLOWSTONE: 24,
+  PORTAL: 25,
+  CHEST: 26,
+  // Tools (not placeable; live in hotbar/inventory)
+  TOOL_PICKAXE: 100,
+  TOOL_AXE: 101,
+  TOOL_SHOVEL: 102,
+  TOOL_SWORD: 103,
 };
 
 // Per-block descriptor.
@@ -35,7 +47,9 @@ export const BLOCK = {
 // hardness: how long it takes to mine (relative units).
 // liquid: water-like.
 // emits: if >0, this block emits light (0..15).
-// powered: redstone visual flag, written/read at runtime.
+// material: 'stone' | 'wood' | 'dirt' | 'metal' | 'glass' | 'organic' (for tool effectiveness).
+// placeable: if false, item only lives in inventory (tools).
+// tool: if set, this is a tool descriptor (not a placeable block).
 const D = (overrides) => ({
   solid: true,
   transparent: false,
@@ -43,7 +57,21 @@ const D = (overrides) => ({
   liquid: false,
   emits: 0,
   drops: null,
+  placeable: true,
+  material: 'misc',
   ...overrides,
+});
+
+const T = (overrides) => ({
+  ...overrides,
+  solid: false,
+  transparent: true,
+  placeable: false,
+  hardness: 0,
+  emits: 0,
+  liquid: false,
+  drops: null,
+  material: 'tool',
 });
 
 export const BLOCKS = {
@@ -66,9 +94,36 @@ export const BLOCKS = {
   [BLOCK.GOLD]: D({ name: 'Золото', color: 0xf5d442, hardness: 5 }),
   [BLOCK.IRON]: D({ name: 'Железо', color: 0xb0b0b8, hardness: 5 }),
   [BLOCK.COAL]: D({ name: 'Уголь', color: 0x222222, hardness: 4 }),
-  [BLOCK.BEDROCK]: D({ name: 'Бедрок', color: 0x333333, hardness: 1000 }),
-  [BLOCK.SNOW]: D({ name: 'Снег', color: 0xf5f9ff, hardness: 0.5 }),
+  [BLOCK.BEDROCK]: D({ name: 'Бедрок', color: 0x333333, hardness: 1000, material: 'stone' }),
+  [BLOCK.SNOW]: D({ name: 'Снег', color: 0xf5f9ff, hardness: 0.5, material: 'dirt' }),
+  [BLOCK.OBSIDIAN]: D({ name: 'Обсидиан', color: 0x1a0a30, hardness: 8, material: 'stone' }),
+  [BLOCK.ENDER_STONE]: D({ name: 'Эндер-камень', color: 0xd0c2a0, hardness: 4, material: 'stone' }),
+  [BLOCK.MAGIC_CRYSTAL]: D({ name: 'Кристалл', color: 0xc070ff, hardness: 3, transparent: true, emits: 10, material: 'glass' }),
+  [BLOCK.GLOWSTONE]: D({ name: 'Светокамень', color: 0xffd070, hardness: 1, emits: 14, material: 'stone' }),
+  [BLOCK.PORTAL]: D({ name: 'Портал', color: 0x9a3afc, transparent: true, solid: false, hardness: 0.5, emits: 8, material: 'glass' }),
+  [BLOCK.CHEST]: D({ name: 'Сундук', color: 0x8a5a2b, topColor: 0x6e4520, sideColor: 0x8a5a2b, bottomColor: 0x6e4520, hardness: 2, material: 'wood' }),
+
+  // Tools.
+  [BLOCK.TOOL_PICKAXE]: T({ name: 'Кирка', color: 0xaaaaaa, tool: 'pickaxe' }),
+  [BLOCK.TOOL_AXE]: T({ name: 'Топор', color: 0x8b5a2b, tool: 'axe' }),
+  [BLOCK.TOOL_SHOVEL]: T({ name: 'Лопата', color: 0x9a8a70, tool: 'shovel' }),
+  [BLOCK.TOOL_SWORD]: T({ name: 'Меч', color: 0xe0e0ff, tool: 'sword' }),
 };
+
+// Set materials on common blocks.
+BLOCKS[BLOCK.STONE].material = 'stone';
+BLOCKS[BLOCK.COBBLESTONE].material = 'stone';
+BLOCKS[BLOCK.GOLD].material = 'stone';
+BLOCKS[BLOCK.IRON].material = 'stone';
+BLOCKS[BLOCK.COAL].material = 'stone';
+BLOCKS[BLOCK.BRICK].material = 'stone';
+BLOCKS[BLOCK.WOOD].material = 'wood';
+BLOCKS[BLOCK.PLANKS].material = 'wood';
+BLOCKS[BLOCK.LEAVES].material = 'organic';
+BLOCKS[BLOCK.DIRT].material = 'dirt';
+BLOCKS[BLOCK.GRASS].material = 'dirt';
+BLOCKS[BLOCK.SAND].material = 'dirt';
+BLOCKS[BLOCK.GLASS].material = 'glass';
 
 // Order shown in inventory / hotbar.
 export const PALETTE = [
@@ -76,7 +131,10 @@ export const PALETTE = [
   BLOCK.WOOD, BLOCK.PLANKS, BLOCK.LEAVES, BLOCK.SAND,
   BLOCK.GLASS, BLOCK.BRICK, BLOCK.GOLD, BLOCK.IRON,
   BLOCK.COAL, BLOCK.SNOW,
+  BLOCK.OBSIDIAN, BLOCK.ENDER_STONE, BLOCK.MAGIC_CRYSTAL, BLOCK.GLOWSTONE, BLOCK.PORTAL,
+  BLOCK.CHEST,
   BLOCK.WIRE, BLOCK.LEVER, BLOCK.BUTTON, BLOCK.LAMP,
+  BLOCK.TOOL_PICKAXE, BLOCK.TOOL_AXE, BLOCK.TOOL_SHOVEL, BLOCK.TOOL_SWORD,
 ];
 
 export function isOpaque(id) {
@@ -106,4 +164,42 @@ export function blockHardness(id) {
 export function isRedstone(id) {
   return id === BLOCK.WIRE || id === BLOCK.LEVER ||
     id === BLOCK.BUTTON || id === BLOCK.LAMP;
+}
+
+export function isChest(id) {
+  return id === BLOCK.CHEST;
+}
+
+export function isPortal(id) {
+  return id === BLOCK.PORTAL;
+}
+
+export function isTool(id) {
+  return BLOCKS[id]?.tool != null;
+}
+
+export function toolKind(id) {
+  return BLOCKS[id]?.tool ?? null;
+}
+
+export function blockMaterial(id) {
+  return BLOCKS[id]?.material ?? 'misc';
+}
+
+// Speed multiplier for breaking `targetBlockId` while holding `toolId`.
+// Higher = faster mining. 1.0 is bare-hand baseline.
+export function toolSpeed(toolId, targetBlockId) {
+  const kind = toolKind(toolId);
+  const mat = blockMaterial(targetBlockId);
+  if (!kind) return 1;
+  if (kind === 'pickaxe' && mat === 'stone') return 4;
+  if (kind === 'axe' && mat === 'wood') return 4;
+  if (kind === 'axe' && mat === 'organic') return 2;
+  if (kind === 'shovel' && mat === 'dirt') return 4;
+  if (kind === 'sword' && mat === 'organic') return 2;
+  return 0.6; // wrong tool slows you down
+}
+
+export function isPlaceable(id) {
+  return BLOCKS[id]?.placeable !== false && id !== BLOCK.AIR;
 }

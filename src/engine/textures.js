@@ -228,6 +228,88 @@ function drawBedrock(ctx) {
   drawSolid(ctx, 0x303030, 0.4);
 }
 
+function drawObsidian(ctx) {
+  drawSolid(ctx, 0x1a0a30, 0.35);
+  // Sparkles.
+  ctx.fillStyle = 'rgba(180,140,255,0.5)';
+  for (let i = 0; i < 6; i++) {
+    const x = Math.floor(Math.random() * TILE_SIZE);
+    const y = Math.floor(Math.random() * TILE_SIZE);
+    ctx.fillRect(x, y, 1, 1);
+  }
+}
+
+function drawEnder(ctx) {
+  drawSolid(ctx, 0xd0c2a0, 0.18);
+  ctx.fillStyle = 'rgba(80,40,90,0.4)';
+  for (let i = 0; i < 8; i++) {
+    const x = Math.floor(Math.random() * TILE_SIZE);
+    const y = Math.floor(Math.random() * TILE_SIZE);
+    ctx.fillRect(x, y, 2, 1);
+  }
+}
+
+function drawCrystal(ctx) {
+  ctx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
+  ctx.fillStyle = 'rgba(160,80,255,0.55)';
+  ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+  ctx.fillStyle = 'rgba(255,200,255,0.8)';
+  ctx.beginPath();
+  ctx.moveTo(8, 1); ctx.lineTo(13, 8); ctx.lineTo(8, 15); ctx.lineTo(3, 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(8, 3); ctx.lineTo(11, 8); ctx.lineTo(8, 13);
+  ctx.stroke();
+}
+
+function drawGlowstone(ctx) {
+  drawSolid(ctx, 0xffd070, 0.05);
+  ctx.fillStyle = 'rgba(255,255,180,0.6)';
+  for (let i = 0; i < 8; i++) {
+    const x = 1 + Math.floor(Math.random() * 14);
+    const y = 1 + Math.floor(Math.random() * 14);
+    ctx.fillRect(x, y, 2, 2);
+  }
+}
+
+function drawPortal(ctx) {
+  ctx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
+  ctx.fillStyle = 'rgba(154,58,252,0.5)';
+  ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+  ctx.fillStyle = 'rgba(220,160,255,0.7)';
+  for (let i = 0; i < 16; i++) {
+    const x = Math.floor(Math.random() * TILE_SIZE);
+    const y = Math.floor(Math.random() * TILE_SIZE);
+    ctx.fillRect(x, y, 1, 1);
+  }
+}
+
+function drawChestSide(ctx) {
+  drawSolid(ctx, 0x8a5a2b, 0.12);
+  ctx.fillStyle = '#5a3915';
+  ctx.fillRect(0, 0, TILE_SIZE, 2);
+  ctx.fillRect(0, 14, TILE_SIZE, 2);
+  ctx.fillRect(0, 0, 2, TILE_SIZE);
+  ctx.fillRect(14, 0, 2, TILE_SIZE);
+  ctx.fillStyle = '#3a2810';
+  ctx.fillRect(0, 7, TILE_SIZE, 1);
+  // Lock.
+  ctx.fillStyle = '#d9b35a';
+  ctx.fillRect(7, 6, 2, 4);
+}
+
+function drawChestTop(ctx) {
+  drawSolid(ctx, 0x6e4520, 0.12);
+  ctx.fillStyle = '#5a3915';
+  ctx.fillRect(0, 0, TILE_SIZE, 2);
+  ctx.fillRect(0, 14, TILE_SIZE, 2);
+  ctx.fillRect(0, 0, 2, TILE_SIZE);
+  ctx.fillRect(14, 0, 2, TILE_SIZE);
+}
+
 // Returns a Three.js texture for the atlas.
 export function buildAtlasTexture() {
   const canvas = document.createElement('canvas');
@@ -243,10 +325,12 @@ export function buildAtlasTexture() {
     fillTile(ctx, tx, ty, drawer);
   };
 
-  // Default: solid color tiles for every block id*3 + face.
+  // Default: solid color tiles for every world-block id*3 + face.
+  // Tools (placeable=false) don't need world tiles.
   for (const [id, def] of Object.entries(BLOCKS)) {
     const blockId = Number(id);
     if (blockId === BLOCK.AIR) continue;
+    if (def.placeable === false) continue;
     const top = def.topColor ?? def.color;
     const side = def.sideColor ?? def.color;
     const bottom = def.bottomColor ?? def.color;
@@ -332,6 +416,28 @@ export function buildAtlasTexture() {
   set(tileIndex(BLOCK.BEDROCK, 0), drawBedrock);
   set(tileIndex(BLOCK.BEDROCK, 1), drawBedrock);
   set(tileIndex(BLOCK.BEDROCK, 2), drawBedrock);
+
+  // Magic dimension blocks.
+  set(tileIndex(BLOCK.OBSIDIAN, 0), (c) => drawObsidian(c));
+  set(tileIndex(BLOCK.OBSIDIAN, 1), (c) => drawObsidian(c));
+  set(tileIndex(BLOCK.OBSIDIAN, 2), (c) => drawObsidian(c));
+  set(tileIndex(BLOCK.ENDER_STONE, 0), (c) => drawEnder(c));
+  set(tileIndex(BLOCK.ENDER_STONE, 1), (c) => drawEnder(c));
+  set(tileIndex(BLOCK.ENDER_STONE, 2), (c) => drawEnder(c));
+  set(tileIndex(BLOCK.MAGIC_CRYSTAL, 0), (c) => drawCrystal(c));
+  set(tileIndex(BLOCK.MAGIC_CRYSTAL, 1), (c) => drawCrystal(c));
+  set(tileIndex(BLOCK.MAGIC_CRYSTAL, 2), (c) => drawCrystal(c));
+  set(tileIndex(BLOCK.GLOWSTONE, 0), (c) => drawGlowstone(c));
+  set(tileIndex(BLOCK.GLOWSTONE, 1), (c) => drawGlowstone(c));
+  set(tileIndex(BLOCK.GLOWSTONE, 2), (c) => drawGlowstone(c));
+  set(tileIndex(BLOCK.PORTAL, 0), (c) => drawPortal(c));
+  set(tileIndex(BLOCK.PORTAL, 1), (c) => drawPortal(c));
+  set(tileIndex(BLOCK.PORTAL, 2), (c) => drawPortal(c));
+
+  // Chest.
+  set(tileIndex(BLOCK.CHEST, 0), (c) => drawChestTop(c));
+  set(tileIndex(BLOCK.CHEST, 1), (c) => drawChestSide(c));
+  set(tileIndex(BLOCK.CHEST, 2), (c) => drawChestTop(c));
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.magFilter = THREE.NearestFilter;

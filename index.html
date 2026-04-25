@@ -24,6 +24,20 @@
         </div>
         <div id="hotbar"></div>
         <div id="hint-box"></div>
+        <div id="quest-panel" class="hidden">
+          <div class="quest-title">Квест</div>
+          <div class="quest-name"></div>
+          <div class="quest-hint"></div>
+          <div class="quest-progress"></div>
+        </div>
+        <div id="dialog-toast" class="hidden"></div>
+      </div>
+
+      <!-- Chest UI -->
+      <div id="chest" class="hidden">
+        <h2>Сундук</h2>
+        <div id="chest-grid"></div>
+        <div class="chest-hint">Клик по слоту — забрать. Shift+клик — положить выбранный блок. Esc — закрыть.</div>
       </div>
 
       <!-- Inventory -->
@@ -44,6 +58,7 @@
               <button data-mode="creative" class="mode-btn selected">Творчество</button>
               <button data-mode="survival" class="mode-btn">Выживание</button>
               <button data-mode="education" class="mode-btn">Образование</button>
+              <button data-mode="magic" class="mode-btn">Магия</button>
             </div>
             <p id="mode-description">Бесконечные ресурсы, полёт, без врагов. Идеально для строительства.</p>
           </div>
@@ -64,7 +79,8 @@
               <li><b>ЛКМ</b> — сломать блок, <b>ПКМ</b> — поставить</li>
               <li><b>Колесо мыши / 1-9</b> — выбор блока в хотбаре</li>
               <li><b>E</b> — инвентарь, <b>Esc</b> — меню паузы, <b>F</b> — переключить полёт</li>
-              <li><b>R</b> — взаимодействовать (рычаг/кнопка для редстоуна)</li>
+              <li><b>R</b> — взаимодействовать (рычаг, сундук, NPC, портал)</li>
+              <li><b>Кирка/Топор/Лопата/Меч</b> — слоты 1-3 хотбара. Меч атакует мобов.</li>
             </ul>
           </div>
         </div>

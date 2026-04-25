@@ -7,6 +7,7 @@ export const MODE = {
   CREATIVE: 'creative',
   SURVIVAL: 'survival',
   EDUCATION: 'education',
+  MAGIC: 'magic',
 };
 
 export class Player {
@@ -30,8 +31,8 @@ export class Player {
 
   setMode(mode) {
     this.mode = mode;
-    if (mode === MODE.CREATIVE) {
-      this.flying = true;
+    if (mode === MODE.CREATIVE || mode === MODE.MAGIC || mode === MODE.EDUCATION) {
+      this.flying = mode === MODE.CREATIVE || mode === MODE.MAGIC;
       this.hp = this.maxHp;
       this.hunger = this.maxHunger;
     } else {

@@ -61,8 +61,9 @@ export class Chunk {
 }
 
 export class World {
-  constructor(seed) {
+  constructor(seed, flavor = 'normal') {
     this.seed = seed | 0;
+    this.flavor = flavor; // 'normal' | 'magic'
     const rand = mulberry32(this.seed);
     this.heightNoise = createNoise2D(rand);
     this.detailNoise = createNoise2D(rand);
@@ -73,14 +74,27 @@ export class World {
     this.chunks = new Map();
     this.changes = new Map(); // worldKey -> blockId, for save/load deltas
     this.redstoneBlocks = new Set(); // 'x,y,z' strings — wires, lamps, levers, buttons
+    this.chestStores = new Map(); // 'x,y,z' -> [blockId, count][]
+    this.villagerSpots = []; // {x, y, z, name}
     for (let cx = 0; cx < WORLD_CHUNKS_X; cx++) {
       for (let cz = 0; cz < WORLD_CHUNKS_Z; cz++) {
         const ch = new Chunk(cx, cz);
-        this.generateChunk(ch);
+        if (flavor === 'magic') this.generateMagicChunk(ch);
+        else this.generateChunk(ch);
         this.chunks.set(this.chunkKey(cx, cz), ch);
       }
     }
-    this.placeTrees();
+    if (flavor === 'magic') this.placeCrystalTowers();
+    else this.placeTrees();
+  }
+
+  // Find the topmost non-air, non-water block at (x,z). Returns y of that block.
+  findGroundY(x, z) {
+    for (let y = WORLD_HEIGHT - 1; y >= 1; y--) {
+      const id = this.getBlock(x, y, z);
+      if (id !== BLOCK.AIR && id !== BLOCK.WATER && id !== BLOCK.LEAVES) return y;
+    }
+    return 1;
   }
 
   chunkKey(cx, cz) { return `${cx},${cz}`; }
@@ -273,6 +287,159 @@ export class World {
       const [x, y, z] = key.split(',').map(Number);
       this.setBlock(x, y, z, id, true);
     }
+  }
+
+  // Magic-dimension world generation: lower terrain, glowstone caves,
+  // ender stone surface, sparse trees replaced by crystal towers.
+  generateMagicChunk(chunk) {
+    const baseX = chunk.cx * CHUNK_SIZE;
+    const baseZ = chunk.cz * CHUNK_SIZE;
+    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+      for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+        const wx = baseX + lx;
+        const wz = baseZ + lz;
+        const continent = (this.heightNoise(wx * 0.008, wz * 0.008) + 1) * 0.5;
+        const detail = (this.detailNoise(wx * 0.05, wz * 0.05) + 1) * 0.5;
+        const height = Math.max(4, Math.min(WORLD_HEIGHT - 8,
+          Math.floor(SEA_LEVEL - 6 + continent * 18 + detail * 4)));
+        for (let y = 0; y < WORLD_HEIGHT; y++) {
+          let id = BLOCK.AIR;
+          if (y === 0) id = BLOCK.BEDROCK;
+          else if (y < height - 3) {
+            const cv = this.caveNoise(wx * 0.06, y * 0.06, wz * 0.06);
+            if (cv > 0.6) id = BLOCK.AIR;
+            else id = BLOCK.OBSIDIAN;
+            const ore = this.oreNoise(wx * 0.25, y * 0.25, wz * 0.25);
+            if (id === BLOCK.OBSIDIAN && ore > 0.7) id = BLOCK.GLOWSTONE;
+          } else if (y < height) id = BLOCK.ENDER_STONE;
+          else if (y === height) id = BLOCK.ENDER_STONE;
+          chunk.set(lx, y, lz, id);
+        }
+      }
+    }
+  }
+
+  placeCrystalTowers() {
+    for (let cx = 0; cx < WORLD_CHUNKS_X; cx++) {
+      for (let cz = 0; cz < WORLD_CHUNKS_Z; cz++) {
+        const ch = this.chunks.get(this.chunkKey(cx, cz));
+        if (!ch) continue;
+        for (let lx = 2; lx < CHUNK_SIZE - 2; lx += 2) {
+          for (let lz = 2; lz < CHUNK_SIZE - 2; lz += 2) {
+            const wx = cx * CHUNK_SIZE + lx;
+            const wz = cz * CHUNK_SIZE + lz;
+            const v = this.treeNoise(wx * 0.3, wz * 0.3);
+            if (v > 0.7) {
+              const surfY = this.findGroundY(wx, wz);
+              if (surfY < 1 || surfY > WORLD_HEIGHT - 6) continue;
+              const h = 3 + Math.floor((Math.abs(wx * 13 + wz * 7) % 4));
+              for (let i = 0; i < h; i++) {
+                this.setBlock(wx, surfY + 1 + i, wz, BLOCK.MAGIC_CRYSTAL, false);
+              }
+              if (Math.abs(wx + wz) % 5 === 0) {
+                this.setBlock(wx, surfY + 1 + h, wz, BLOCK.GLOWSTONE, false);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Generate a small village near (cx, cz) center: 4 wooden houses + paths.
+  // Returns an array of villager spawn points {x, y, z, name}.
+  generateVillage(cx, cz) {
+    const spawns = [];
+    const houses = [
+      { dx: -8, dz: -8 }, { dx: 8, dz: -8 },
+      { dx: -8, dz: 8 }, { dx: 8, dz: 8 },
+    ];
+    for (let i = 0; i < houses.length; i++) {
+      const hx = cx + houses[i].dx;
+      const hz = cz + houses[i].dz;
+      this.buildHouse(hx, hz);
+      const sy = this.findGroundY(hx, hz) + 1;
+      spawns.push({
+        x: hx + 0.5, y: sy, z: hz + 0.5,
+        name: `\u0416\u0438\u0442\u0435\u043b\u044c-${i + 1}`,
+      });
+    }
+    // Stone path between houses (cross shape).
+    for (let d = -8; d <= 8; d++) {
+      const px = cx + d, pz = cz;
+      const py = this.findGroundY(px, pz);
+      if (this.getBlock(px, py, pz) === BLOCK.GRASS || this.getBlock(px, py, pz) === BLOCK.DIRT) {
+        this.setBlock(px, py, pz, BLOCK.COBBLESTONE, false);
+      }
+      const px2 = cx, pz2 = cz + d;
+      const py2 = this.findGroundY(px2, pz2);
+      if (this.getBlock(px2, py2, pz2) === BLOCK.GRASS || this.getBlock(px2, py2, pz2) === BLOCK.DIRT) {
+        this.setBlock(px2, py2, pz2, BLOCK.COBBLESTONE, false);
+      }
+    }
+    // Central well (glass + water).
+    const wy = this.findGroundY(cx, cz);
+    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      this.setBlock(cx + dx, wy + 1, cz + dz, BLOCK.COBBLESTONE, false);
+    }
+    this.setBlock(cx, wy, cz, BLOCK.WATER, false);
+    this.setBlock(cx, wy + 1, cz, BLOCK.GLASS, false);
+    return spawns;
+  }
+
+  buildHouse(hx, hz) {
+    const groundY = this.findGroundY(hx, hz);
+    const baseY = groundY + 1;
+    const r = 3;
+    // Floor (planks).
+    for (let x = -r; x <= r; x++) {
+      for (let z = -r; z <= r; z++) {
+        this.setBlock(hx + x, baseY, hz + z, BLOCK.PLANKS, false);
+      }
+    }
+    // Walls (planks). Height 3.
+    for (let h = 1; h <= 3; h++) {
+      for (let x = -r; x <= r; x++) {
+        this.setBlock(hx + x, baseY + h, hz - r, BLOCK.PLANKS, false);
+        this.setBlock(hx + x, baseY + h, hz + r, BLOCK.PLANKS, false);
+      }
+      for (let z = -r; z <= r; z++) {
+        this.setBlock(hx - r, baseY + h, hz + z, BLOCK.PLANKS, false);
+        this.setBlock(hx + r, baseY + h, hz + z, BLOCK.PLANKS, false);
+      }
+    }
+    // Door (air opening on +Z side).
+    this.setBlock(hx, baseY + 1, hz + r, BLOCK.AIR, false);
+    this.setBlock(hx, baseY + 2, hz + r, BLOCK.AIR, false);
+    // Windows (glass).
+    this.setBlock(hx - r, baseY + 2, hz, BLOCK.GLASS, false);
+    this.setBlock(hx + r, baseY + 2, hz, BLOCK.GLASS, false);
+    this.setBlock(hx, baseY + 2, hz - r, BLOCK.GLASS, false);
+    // Roof (cobblestone).
+    for (let x = -r; x <= r; x++) {
+      for (let z = -r; z <= r; z++) {
+        this.setBlock(hx + x, baseY + 4, hz + z, BLOCK.COBBLESTONE, false);
+      }
+    }
+    // Chimney.
+    this.setBlock(hx + r - 1, baseY + 5, hz - r + 1, BLOCK.BRICK, false);
+    this.setBlock(hx + r - 1, baseY + 6, hz - r + 1, BLOCK.BRICK, false);
+    // Lamp inside.
+    this.setBlock(hx, baseY + 3, hz, BLOCK.LAMP, false);
+    // Chest inside (corner) — populated by game later.
+    this.setBlock(hx - r + 1, baseY + 1, hz - r + 1, BLOCK.CHEST, false);
+  }
+
+  // Persistent chest contents.
+  getChest(x, y, z) {
+    const k = `${x},${y},${z}`;
+    return this.chestStores.get(k) ?? null;
+  }
+
+  setChest(x, y, z, items) {
+    const k = `${x},${y},${z}`;
+    if (!items || items.length === 0) this.chestStores.delete(k);
+    else this.chestStores.set(k, items);
   }
 
   // Helper: is the block at (x,y,z) opaque?

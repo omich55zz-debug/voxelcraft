@@ -30,6 +30,8 @@ export function saveGame(state) {
       ),
       creative: state.inventory.creative,
     },
+    flavor: state.world.flavor,
+    chests: Object.fromEntries(state.world.chestStores ?? []),
   };
   try {
     localStorage.setItem(KEY, JSON.stringify(payload));
