@@ -7,12 +7,18 @@ import { buildChunkMesh } from '../engine/mesher.js';
 import { buildAtlasTexture } from '../engine/textures.js';
 import { Player, MODE } from '../engine/player.js';
 import { raycastVoxel } from '../engine/raycast.js';
-import { BLOCK, BLOCKS, blockHardness, isRedstone } from '../engine/blocks.js';
+import {
+  BLOCK, BLOCKS, blockHardness, isRedstone,
+  isTool, toolSpeed, isChest, isPortal,
+} from '../engine/blocks.js';
 import { RedstoneSim } from '../engine/redstone.js';
 import { Inventory } from './inventory.js';
-import { Zombie } from './mobs.js';
+import { Zombie, Villager } from './mobs.js';
 import { saveGame } from './save.js';
 import { EducationState } from './education.js';
+import { QuestTracker } from './quests.js';
+import { ViewModel } from './viewmodel.js';
+import { settings } from './settings.js';
 
 const PLACE_DELAY = 180; // ms between placements when holding RMB
 
@@ -24,7 +30,7 @@ export class Game {
     this.scene.background = new THREE.Color(0x88bbee);
     this.scene.fog = new THREE.Fog(0x88bbee, 50, 140);
 
-    this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 500);
+    this.camera = new THREE.PerspectiveCamera(settings.get('fov'), 1, 0.1, 500);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -63,6 +69,12 @@ export class Game {
     this.hud.buildHotbar();
     this.redstone = null;
     this.education = null;
+    this.quests = null;
+    this.villagers = [];
+    this.openChestPos = null;
+    // Add the camera to the scene so children (held-item viewmodel) render.
+    this.scene.add(this.camera);
+    this.viewModel = new ViewModel(this.camera, this.opaqueMaterial);
 
     this.chunkMeshes = new Map(); // key -> { opaque, transparent }
 
@@ -97,7 +109,25 @@ export class Game {
 
     this._bindInput();
     this._resize();
+    this._applySettings();
+    settings.onChange(() => this._applySettings());
     addEventListener('resize', () => this._resize());
+  }
+
+  _applySettings() {
+    const fov = settings.get('fov');
+    if (fov && this.camera.fov !== fov) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+    const rd = settings.get('renderDistance');
+    if (rd != null && this.scene.fog) {
+      const blocks = Math.max(40, rd * 16);
+      this.scene.fog.near = blocks * 0.5;
+      this.scene.fog.far = blocks;
+      this.camera.far = Math.max(200, blocks + 80);
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   _resize() {
@@ -110,11 +140,14 @@ export class Game {
 
   startNewWorld(seed, mode) {
     this.disposeWorld();
-    this.world = new World(seed);
+    const flavor = (mode === MODE.MAGIC) ? 'magic' : 'normal';
+    this.world = new World(seed, flavor);
     this.redstone = new RedstoneSim(this.world);
     this.player = new Player(this.camera);
     this.player.setMode(mode);
-    this.inventory = new Inventory(mode === MODE.CREATIVE || mode === MODE.EDUCATION);
+    this.inventory = new Inventory(
+      mode === MODE.CREATIVE || mode === MODE.EDUCATION || mode === MODE.MAGIC,
+    );
     this.hud.inventory = this.inventory;
     this.hud.buildHotbar();
     if (mode === MODE.EDUCATION) {
@@ -122,28 +155,50 @@ export class Game {
     } else {
       this.education = null;
     }
+    this.quests = new QuestTracker();
     this.timeOfDay = 0.35;
-    // Spawn at the world center, on the ground.
-    const sx = (CHUNK_SIZE * WORLD_CHUNKS_X) / 2 + 0.5;
-    const sz = (CHUNK_SIZE * WORLD_CHUNKS_Z) / 2 + 0.5;
+    // Generate a starting village in the normal overworld first, so we can
+    // place the spawn just outside it on a clear patch.
+    const cx = (CHUNK_SIZE * WORLD_CHUNKS_X) / 2;
+    const cz = (CHUNK_SIZE * WORLD_CHUNKS_Z) / 2;
+    if (flavor === 'normal') {
+      const spots = this.world.generateVillage(cx, cz);
+      this.world.villagerSpots = spots;
+      for (const s of spots) {
+        const v = new Villager(this.world, s.x, s.y, s.z, s.name);
+        this.villagers.push(v);
+        this.mobGroup.add(v.group);
+      }
+    }
+    // Spawn ~16 blocks south of the village center, looking north toward it.
+    const spawnOffset = (flavor === 'normal') ? 16 : 0;
+    const sx = cx + 0.5;
+    const sz = cz + spawnOffset + 0.5;
     let sy = 60;
     for (let y = 60; y >= 1; y--) {
       const id = this.world.getBlock(Math.floor(sx), y, Math.floor(sz));
       if (id !== BLOCK.AIR && id !== BLOCK.WATER) { sy = y + 1; break; }
     }
     this.player.position.set(sx, sy, sz);
+    this.player.yaw = Math.PI; // face -z (north toward village)
     if (this.education) {
       this.education.startPos.copy(this.player.position);
       this.education.startYaw = this.player.yaw;
     }
     this.regenAllChunks();
+    this.hud.setQuest(this.quests.active(), this.quests.completedCount(), this.quests.totalCount());
   }
 
   loadFromSave(save) {
     this.disposeWorld();
     const mode = save.player.mode || MODE.CREATIVE;
-    this.world = new World(save.seed);
+    this.world = new World(save.seed, save.flavor || 'normal');
     this.world.applyChanges(save.changes || {});
+    if (save.chests) {
+      for (const [k, items] of Object.entries(save.chests)) {
+        this.world.chestStores.set(k, items);
+      }
+    }
     this.redstone = new RedstoneSim(this.world);
     this.player = new Player(this.camera);
     this.player.setMode(mode);
@@ -164,7 +219,9 @@ export class Game {
     this.hud.inventory = this.inventory;
     this.hud.buildHotbar();
     this.education = mode === MODE.EDUCATION ? new EducationState(this.player) : null;
+    this.quests = new QuestTracker();
     this.regenAllChunks();
+    this.hud.setQuest(this.quests.active(), this.quests.completedCount(), this.quests.totalCount());
   }
 
   disposeWorld() {
@@ -181,6 +238,9 @@ export class Game {
     this.chunkMeshes.clear();
     while (this.mobGroup.children.length) this.mobGroup.remove(this.mobGroup.children[0]);
     this.mobs = [];
+    this.villagers = [];
+    this.openChestPos = null;
+    this.hud.hideChest();
   }
 
   regenAllChunks() {
@@ -257,9 +317,15 @@ export class Game {
         this.canvas.requestPointerLock?.();
         return;
       }
-      if (e.button === 0) this.mouseButtons.left = true;
-      if (e.button === 2) this.mouseButtons.right = true;
-      if (e.button === 2) this.tryPlace();
+      if (e.button === 0) {
+        this.mouseButtons.left = true;
+        this.viewModel?.triggerSwing();
+      }
+      if (e.button === 2) {
+        this.mouseButtons.right = true;
+        this.viewModel?.triggerSwing();
+        this.tryPlace();
+      }
     });
     addEventListener('mouseup', (e) => {
       if (e.button === 0) this.mouseButtons.left = false;
@@ -268,7 +334,9 @@ export class Game {
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     addEventListener('mousemove', (e) => {
       if (!this.pointerLocked || this.paused) return;
-      this.player.applyMouseLook(e.movementX, e.movementY);
+      const sens = 0.0025 * (settings.get('mouseSensitivity') || 1.0);
+      const dy = settings.get('invertY') ? -e.movementY : e.movementY;
+      this.player.applyMouseLook(e.movementX, dy, sens);
     });
     document.addEventListener('pointerlockchange', () => {
       this.pointerLocked = (document.pointerLockElement === this.canvas);
@@ -326,8 +394,22 @@ export class Game {
       this._lastPlace = now;
       return;
     }
+    // Open chest UI when right-clicking a chest.
+    if (isChest(hit.block.id)) {
+      this.openChest(hit.block.x, hit.block.y, hit.block.z);
+      this._lastPlace = now;
+      return;
+    }
+    // Right-click portal -> swap to magic dimension.
+    if (isPortal(hit.block.id)) {
+      this.enterMagicDimension();
+      this._lastPlace = now;
+      return;
+    }
 
     const blockId = this.inventory.selectedBlock();
+    // Tools cannot be placed in the world.
+    if (isTool(blockId)) return;
     if (!this.inventory.has(blockId)) return;
     if (!this.world.inBounds(hit.place.x, hit.place.y, hit.place.z)) return;
     if (this.world.getBlock(hit.place.x, hit.place.y, hit.place.z) !== BLOCK.AIR) return;
@@ -347,16 +429,98 @@ export class Game {
     this.inventory.consume(blockId);
     this._lastPlace = now;
     this.education?.notePlace();
+    this.quests?.state.notePlace(blockId);
+    this.pollQuests();
   }
 
   interact() {
+    // Talk to nearest villager within 3 blocks first.
+    const v = this.nearestVillagerWithinSight(3.5);
+    if (v) {
+      this.hud.showDialog(v.greet());
+      if (this.quests) this.quests.state.spokeToVillager = true;
+      this.pollQuests();
+      return;
+    }
     const hit = this.raycast();
     if (!hit) return;
     if (hit.block.id === BLOCK.LEVER) {
       this.redstone.toggleLever(hit.block.x, hit.block.y, hit.block.z);
     } else if (hit.block.id === BLOCK.BUTTON) {
       this.redstone.pressButton(hit.block.x, hit.block.y, hit.block.z);
+    } else if (isChest(hit.block.id)) {
+      this.openChest(hit.block.x, hit.block.y, hit.block.z);
+    } else if (isPortal(hit.block.id)) {
+      this.enterMagicDimension();
     }
+  }
+
+  nearestVillagerWithinSight(maxDist) {
+    if (!this.villagers || this.villagers.length === 0) return null;
+    const eye = this.player.eyePosition();
+    let best = null;
+    let bestDist = maxDist;
+    for (const v of this.villagers) {
+      if (!v.alive) continue;
+      const d = eye.distanceTo(v.position);
+      if (d < bestDist) { best = v; bestDist = d; }
+    }
+    return best;
+  }
+
+  openChest(x, y, z) {
+    let items = this.world.getChest(x, y, z);
+    if (!items) {
+      items = new Array(27).fill(null);
+      this.world.setChest(x, y, z, items);
+    }
+    this.openChestPos = { x, y, z };
+    this.hud.showChest(items, (slot, action) => this.onChestSlot(slot, action));
+    if (this.quests) this.quests.state.openedChest = true;
+  }
+
+  onChestSlot(slot, action) {
+    if (!this.openChestPos) return;
+    const items = this.world.getChest(
+      this.openChestPos.x, this.openChestPos.y, this.openChestPos.z,
+    );
+    if (!items) return;
+    if (action === 'take' && items[slot]) {
+      const it = items[slot];
+      this.inventory.add(it.id, it.count);
+      items[slot] = null;
+    } else if (action === 'put') {
+      const heldId = this.inventory.selectedBlock();
+      if (heldId === BLOCK.AIR) return;
+      if (isTool(heldId)) return; // don't deposit tools
+      if (!this.inventory.has(heldId)) return;
+      this.inventory.consume(heldId);
+      if (items[slot] && items[slot].id === heldId) items[slot].count += 1;
+      else items[slot] = { id: heldId, count: 1 };
+    }
+    this.world.setChest(
+      this.openChestPos.x, this.openChestPos.y, this.openChestPos.z, items,
+    );
+    this.hud.showChest(items, (s, a) => this.onChestSlot(s, a));
+  }
+
+  enterMagicDimension() {
+    if (this.quests) this.quests.state.enteredMagic = true;
+    this.hud.showDialog('Портал активирован! Перенос в магическое измерение...');
+    setTimeout(() => this.startNewWorld((Math.random() * 1e9) | 0, MODE.MAGIC), 800);
+  }
+
+  pollQuests() {
+    if (!this.quests) return;
+    const completed = this.quests.poll();
+    if (completed) {
+      this.hud.showDialog(`Квест выполнен: ${completed.title}!`);
+    }
+    this.hud.setQuest(
+      this.quests.active(),
+      this.quests.completedCount(),
+      this.quests.totalCount(),
+    );
   }
 
   tryBreak(dt) {
@@ -375,6 +539,11 @@ export class Game {
       this._breakHoldTime = 0;
       return;
     }
+    // Sword swing: try to hit a nearby zombie first.
+    const heldId = this.inventory.selectedBlock();
+    if (heldId === BLOCK.TOOL_SWORD) {
+      this.trySwordHit();
+    }
     const k = `${hit.block.x},${hit.block.y},${hit.block.z}`;
     if (this._breakingTarget !== k) {
       this._breakingTarget = k;
@@ -383,21 +552,61 @@ export class Game {
     const def = BLOCKS[hit.block.id];
     if (!def || hit.block.id === BLOCK.AIR || hit.block.id === BLOCK.BEDROCK) return;
     const required = blockHardness(hit.block.id);
-    // Creative breaks instantly. Survival/Education uses hardness * 0.3s.
-    const needTime = (this.player.mode === MODE.CREATIVE) ? 0 : required * 0.3;
+    const speed = toolSpeed(heldId, hit.block.id);
+    // Creative & magic break instantly. Otherwise hardness * 0.3s / speed.
+    const fast = this.player.mode === MODE.CREATIVE || this.player.mode === MODE.MAGIC;
+    const needTime = fast ? 0 : (required * 0.3) / speed;
     this._breakHoldTime += dt;
     if (this._breakHoldTime >= needTime) {
       const drop = def.drops ?? hit.block.id;
+      const brokenId = hit.block.id;
       this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BLOCK.AIR);
       this.world.setMeta(hit.block.x, hit.block.y, hit.block.z, null);
+      // If we broke a chest, drop its contents into the player inventory.
+      if (brokenId === BLOCK.CHEST) {
+        const items = this.world.getChest(hit.block.x, hit.block.y, hit.block.z);
+        if (items) {
+          for (const it of items) if (it) this.inventory.add(it.id, it.count);
+          this.world.setChest(hit.block.x, hit.block.y, hit.block.z, null);
+        }
+      }
       this._breakingTarget = null;
       this._breakHoldTime = 0;
       // Add to inventory in survival/education.
       if (drop !== BLOCK.AIR && drop != null) this.inventory.add(drop, 1);
       this.education?.noteBreak();
+      this.quests?.state.noteBreak(brokenId);
+      if (brokenId === BLOCK.MAGIC_CRYSTAL) this.quests.state.foundCrystal = true;
       // Mark redstone-affected chunk if appropriate.
-      if (isRedstone(hit.block.id)) {
+      if (isRedstone(brokenId)) {
         this.redstone.markDirty(hit.block.x, hit.block.z);
+      }
+      this.pollQuests();
+    }
+  }
+
+  trySwordHit() {
+    const now = performance.now();
+    if (now - (this._lastSwordSwing ?? 0) < 400) return;
+    const eye = this.player.eyePosition();
+    const dir = this.player.lookDir();
+    let bestMob = null;
+    let bestT = 4; // 4-block reach
+    for (const m of this.mobs) {
+      if (!m.alive) continue;
+      const toMob = m.position.clone().add(new THREE.Vector3(0, 1.2, 0)).sub(eye);
+      const t = toMob.dot(dir);
+      if (t < 0 || t > bestT) continue;
+      const perp = toMob.clone().sub(dir.clone().multiplyScalar(t)).length();
+      if (perp < 0.7) { bestMob = m; bestT = t; }
+    }
+    if (bestMob) {
+      this._lastSwordSwing = now;
+      const wasAlive = bestMob.alive;
+      bestMob.damage(6);
+      if (wasAlive && !bestMob.alive) {
+        this.quests?.state.noteKill(bestMob.kind);
+        this.pollQuests();
       }
     }
   }
@@ -446,31 +655,58 @@ export class Game {
     }
   }
 
+  updateVillagers(dt) {
+    for (const v of this.villagers) {
+      if (!v.alive) continue;
+      v.update(dt);
+    }
+  }
+
+  checkLitLamps() {
+    if (!this.world || !this.quests) return;
+    let lit = 0;
+    for (const key of this.world.redstoneBlocks) {
+      const [x, y, z] = key.split(',').map(Number);
+      if (this.world.getBlock(x, y, z) === BLOCK.LAMP) {
+        const meta = this.world.getMeta(x, y, z);
+        if (meta && meta > 0) lit++;
+      }
+    }
+    if (lit > this.quests.state.litLamps) {
+      this.quests.state.litLamps = lit;
+      this.pollQuests();
+    }
+  }
+
   // ---------- day / night ----------
   updateSky(dt) {
     this.timeOfDay = (this.timeOfDay + dt * this.daySpeed) % 1;
-    // Sun arcs across the sky.
+    // t=0 midnight, t=0.5 noon. dayFactor: 0 at midnight, 1 at noon.
     const t = this.timeOfDay;
-    const angle = t * Math.PI * 2 - Math.PI / 2;
-    const sx = Math.cos(angle) * 200;
-    const sy = Math.sin(angle) * 200;
-    this.sunLight.position.set(sx, Math.abs(sy) + 30, 100);
-    // Brightness falls off at night.
-    const dayFactor = Math.max(0, Math.sin(t * Math.PI * 2));
-    this.sunLight.intensity = 0.4 + dayFactor * 0.7;
-    this.ambient.intensity = 0.25 + dayFactor * 0.4;
-    this.hemi.intensity = 0.2 + dayFactor * 0.4;
-    // Sky color: morning -> blue, noon -> bright blue, evening -> orange, night -> dark blue.
+    const dayFactor = Math.max(0, -Math.cos(t * Math.PI * 2));
+    // Sun arcs from east (sunrise t=0.25) to west (sunset t=0.75).
+    const sunAngle = (t - 0.25) * Math.PI * 2;
+    const sx = Math.sin(sunAngle) * 200;
+    const sy = Math.max(0, Math.cos(sunAngle)) * 200 + 40;
+    this.sunLight.position.set(sx, sy, 100);
+    this.sunLight.intensity = 0.35 + dayFactor * 0.85;
+    this.ambient.intensity = 0.3 + dayFactor * 0.45;
+    this.hemi.intensity = 0.25 + dayFactor * 0.4;
+    // Sky color: night -> dark blue, dawn/dusk -> orange, day -> bright blue.
     const skyColor = new THREE.Color();
-    if (dayFactor > 0.05) {
-      const horizon = new THREE.Color(0x88bbee);
-      const mid = new THREE.Color(0xa9d2f5);
-      skyColor.copy(horizon).lerp(mid, dayFactor);
+    const day = new THREE.Color(0x88bbee);
+    const noon = new THREE.Color(0xa9d2f5);
+    const dusk = new THREE.Color(0xff9550);
+    const night = new THREE.Color(0x0a1530);
+    // Horizon glow when sun is near the horizon (t around 0.25 or 0.75).
+    const horizonGlow = Math.max(0,
+      1 - Math.min(Math.abs(t - 0.25), Math.abs(t - 0.75)) * 8);
+    if (dayFactor > 0.02) {
+      skyColor.copy(day).lerp(noon, dayFactor * 0.7);
+      if (horizonGlow > 0) skyColor.lerp(dusk, horizonGlow * 0.6);
     } else {
-      const dusk = new THREE.Color(0xff9550);
-      const night = new THREE.Color(0x0a1530);
-      const k = Math.min(1, Math.max(0, (Math.abs(dayFactor) + 0.2) * 2));
-      skyColor.copy(night).lerp(dusk, k * 0.3);
+      skyColor.copy(night);
+      if (horizonGlow > 0) skyColor.lerp(dusk, horizonGlow * 0.5);
     }
     this.scene.background.copy(skyColor);
     this.scene.fog.color.copy(skyColor);
@@ -509,15 +745,21 @@ export class Game {
       }
       this.spawnNightMobs(dt);
       this.updateMobs(dt);
+      this.updateVillagers(dt);
       this.updateSky(dt);
       const redstoneChanged = this.redstone?.step(dt);
       if (redstoneChanged) {
         this._rebuildDirtyChunks();
+        this.checkLitLamps();
       }
       // Education tracking.
       this.education?.update(this.player, this.world);
       const hint = this.education?.current()?.text ?? null;
       this.hud.setHint(hint);
+      // Held viewmodel.
+      this.viewModel.setHeld(this.inventory.selectedBlock());
+      const walkSpeed = Math.hypot(this.player.velocity.x, this.player.velocity.z);
+      this.viewModel.update(dt, walkSpeed);
       this.hud.refresh(this.player, this.timeOfDay);
       this.renderer.render(this.scene, this.camera);
     };

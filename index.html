@@ -2,9 +2,16 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1a2a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VoxelCraft" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>VoxelCraft — 3D песочница</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%237cba3a'/%3E%3Crect width='32' height='10' y='22' fill='%238b5a2b'/%3E%3C/svg%3E" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="stylesheet" href="/src/ui/styles.css" />
   </head>
   <body>
@@ -17,13 +24,47 @@
       <!-- HUD -->
       <div id="hud" class="hidden">
         <div id="status-bar">
-          <div id="health-bar" class="stat-bar"><span class="label">HP</span><div class="fill"></div></div>
-          <div id="hunger-bar" class="stat-bar"><span class="label">FOOD</span><div class="fill"></div></div>
-          <div id="mode-indicator">CREATIVE</div>
-          <div id="time-indicator">12:00</div>
+          <div id="mode-pill"><span class="ico">⚒</span><span class="txt">CREATIVE</span></div>
+          <div id="time-pill"><span class="ico">☀</span><span class="txt">12:00</span></div>
+          <div id="fps-pill" class="hidden"><span class="ico">⏱</span><span class="txt">60</span></div>
+        </div>
+        <div id="vitals">
+          <div id="hearts" class="vital-row" aria-label="Здоровье"></div>
+          <div id="hunger" class="vital-row" aria-label="Голод"></div>
         </div>
         <div id="hotbar"></div>
         <div id="hint-box"></div>
+        <div id="quest-panel" class="hidden">
+          <div class="quest-title">Квест</div>
+          <div class="quest-name"></div>
+          <div class="quest-hint"></div>
+          <div class="quest-progress"></div>
+        </div>
+        <div id="dialog-toast" class="hidden"></div>
+      </div>
+
+      <!-- Touch controls (mobile/Android) -->
+      <div id="touch" class="hidden">
+        <div class="look-area"></div>
+        <div class="joy-base"><div class="joy-knob"></div></div>
+        <div class="touch-buttons">
+          <button id="btn-jump" class="touch-btn">▲</button>
+          <button id="btn-crouch" class="touch-btn">▼</button>
+          <button id="btn-fly" class="touch-btn">F</button>
+          <button id="btn-sprint" class="touch-btn">»</button>
+          <button id="btn-dig" class="touch-btn primary">⛏</button>
+          <button id="btn-place" class="touch-btn primary">▣</button>
+          <button id="btn-r" class="touch-btn">R</button>
+          <button id="btn-inv" class="touch-btn">≡</button>
+          <button id="btn-pause" class="touch-btn">II</button>
+        </div>
+      </div>
+
+      <!-- Chest UI -->
+      <div id="chest" class="hidden">
+        <h2>Сундук</h2>
+        <div id="chest-grid"></div>
+        <div class="chest-hint">Клик по слоту — забрать. Shift+клик — положить выбранный блок. Esc — закрыть.</div>
       </div>
 
       <!-- Inventory -->
@@ -37,13 +78,14 @@
       <div id="menu">
         <div class="menu-card">
           <h1>VoxelCraft</h1>
-          <p class="subtitle">3D песочница на Three.js</p>
+          <p class="subtitle">3D песочница на Three.js — играй на ПК и Android</p>
           <div class="menu-section">
             <h3>Режим игры</h3>
             <div class="mode-buttons">
               <button data-mode="creative" class="mode-btn selected">Творчество</button>
               <button data-mode="survival" class="mode-btn">Выживание</button>
               <button data-mode="education" class="mode-btn">Образование</button>
+              <button data-mode="magic" class="mode-btn">Магия</button>
             </div>
             <p id="mode-description">Бесконечные ресурсы, полёт, без врагов. Идеально для строительства.</p>
           </div>
@@ -53,6 +95,7 @@
               <button id="btn-new">Новый мир</button>
               <button id="btn-load">Загрузить</button>
               <button id="btn-resume" class="hidden">Продолжить</button>
+              <button id="btn-settings" class="ghost">Настройки</button>
             </div>
             <label class="seed-label">Seed: <input type="number" id="seed-input" value="1337" /></label>
           </div>
@@ -64,8 +107,78 @@
               <li><b>ЛКМ</b> — сломать блок, <b>ПКМ</b> — поставить</li>
               <li><b>Колесо мыши / 1-9</b> — выбор блока в хотбаре</li>
               <li><b>E</b> — инвентарь, <b>Esc</b> — меню паузы, <b>F</b> — переключить полёт</li>
-              <li><b>R</b> — взаимодействовать (рычаг/кнопка для редстоуна)</li>
+              <li><b>R</b> — взаимодействовать (рычаг, сундук, NPC, портал)</li>
+              <li><b>Touch:</b> джойстик слева, свайп справа — камера, ⛏ — копать, ▣ — поставить, ▲ — прыжок, F — полёт</li>
             </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div id="settings" class="hidden">
+        <div class="menu-card settings-card">
+          <h2>Настройки</h2>
+          <div class="settings-section">
+            <h3>Графика</h3>
+            <label class="set-row">
+              <span class="set-label">Поле зрения (FOV)</span>
+              <input type="range" id="set-fov" min="50" max="100" step="1" />
+              <output id="out-fov"></output>
+            </label>
+            <label class="set-row">
+              <span class="set-label">Дальность прорисовки</span>
+              <input type="range" id="set-rd" min="3" max="12" step="1" />
+              <output id="out-rd"></output>
+            </label>
+            <label class="set-row">
+              <input type="checkbox" id="set-fps" />
+              <span>Показывать FPS</span>
+            </label>
+          </div>
+          <div class="settings-section">
+            <h3>Управление</h3>
+            <label class="set-row">
+              <span class="set-label">Чувствительность мыши</span>
+              <input type="range" id="set-mouse" min="0.2" max="3.0" step="0.1" />
+              <output id="out-mouse"></output>
+            </label>
+            <label class="set-row">
+              <input type="checkbox" id="set-invert-y" />
+              <span>Инвертировать Y</span>
+            </label>
+            <label class="set-row">
+              <span class="set-label">Чувствительность тача</span>
+              <input type="range" id="set-touch" min="0.5" max="6.0" step="0.1" />
+              <output id="out-touch"></output>
+            </label>
+            <label class="set-row">
+              <span class="set-label">Размер кнопок (тач)</span>
+              <input type="range" id="set-touch-size" min="0.7" max="1.4" step="0.05" />
+              <output id="out-touch-size"></output>
+            </label>
+          </div>
+          <div class="settings-section">
+            <h3>Интерфейс</h3>
+            <label class="set-row">
+              <input type="checkbox" id="set-show-hud" />
+              <span>Показывать HUD</span>
+            </label>
+            <label class="set-row">
+              <input type="checkbox" id="set-show-crosshair" />
+              <span>Показывать прицел</span>
+            </label>
+          </div>
+          <div class="settings-section">
+            <h3>Звук</h3>
+            <label class="set-row">
+              <span class="set-label">Громкость</span>
+              <input type="range" id="set-volume" min="0" max="1" step="0.05" />
+              <output id="out-volume"></output>
+            </label>
+          </div>
+          <div class="settings-actions">
+            <button id="set-reset" class="ghost">Сбросить</button>
+            <button id="set-close">Закрыть</button>
           </div>
         </div>
       </div>
@@ -84,5 +197,13 @@
     </div>
 
     <script type="module" src="/src/main.js"></script>
+    <script>
+      // PWA: register service worker for offline play.
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>
