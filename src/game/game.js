@@ -18,6 +18,7 @@ import { saveGame } from './save.js';
 import { EducationState } from './education.js';
 import { QuestTracker } from './quests.js';
 import { ViewModel } from './viewmodel.js';
+import { settings } from './settings.js';
 
 const PLACE_DELAY = 180; // ms between placements when holding RMB
 
@@ -29,7 +30,7 @@ export class Game {
     this.scene.background = new THREE.Color(0x88bbee);
     this.scene.fog = new THREE.Fog(0x88bbee, 50, 140);
 
-    this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 500);
+    this.camera = new THREE.PerspectiveCamera(settings.get('fov'), 1, 0.1, 500);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -108,7 +109,25 @@ export class Game {
 
     this._bindInput();
     this._resize();
+    this._applySettings();
+    settings.onChange(() => this._applySettings());
     addEventListener('resize', () => this._resize());
+  }
+
+  _applySettings() {
+    const fov = settings.get('fov');
+    if (fov && this.camera.fov !== fov) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+    const rd = settings.get('renderDistance');
+    if (rd != null && this.scene.fog) {
+      const blocks = Math.max(40, rd * 16);
+      this.scene.fog.near = blocks * 0.5;
+      this.scene.fog.far = blocks;
+      this.camera.far = Math.max(200, blocks + 80);
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   _resize() {
@@ -315,7 +334,9 @@ export class Game {
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     addEventListener('mousemove', (e) => {
       if (!this.pointerLocked || this.paused) return;
-      this.player.applyMouseLook(e.movementX, e.movementY);
+      const sens = 0.0025 * (settings.get('mouseSensitivity') || 1.0);
+      const dy = settings.get('invertY') ? -e.movementY : e.movementY;
+      this.player.applyMouseLook(e.movementX, dy, sens);
     });
     document.addEventListener('pointerlockchange', () => {
       this.pointerLocked = (document.pointerLockElement === this.canvas);

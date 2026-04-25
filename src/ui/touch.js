@@ -7,6 +7,8 @@
 // the desktop input code already uses, so the rest of the game does not have
 // to know about touch input at all.
 
+import { settings } from '../game/settings.js';
+
 const ACTIVE_KEY_FOR_BUTTON = {
   'btn-jump':    'Space',
   'btn-fly':     'KeyF',
@@ -30,7 +32,7 @@ export class TouchControls {
     this._lookActiveTouchId = null;
     this._lookLastX = 0;
     this._lookLastY = 0;
-    this._lookSensitivity = 2.4;
+    this._lookSensitivity = settings.get('touchSensitivity') || 2.4;
     this.joyKnob = this.root.querySelector('.joy-knob');
     this.joyBase = this.root.querySelector('.joy-base');
     this.lookArea = this.root.querySelector('.look-area');
@@ -38,6 +40,14 @@ export class TouchControls {
     this._wireLook();
     this._wireButtons();
     this._wireHotbar();
+    this._applySettings();
+    settings.onChange(() => this._applySettings());
+  }
+
+  _applySettings() {
+    this._lookSensitivity = settings.get('touchSensitivity') || 2.4;
+    const size = settings.get('touchButtonSize') || 1.0;
+    if (this.root) this.root.style.setProperty('--touch-scale', String(size));
   }
 
   show() { if (this.root) this.root.classList.remove('hidden'); }
@@ -124,7 +134,8 @@ export class TouchControls {
         this._lookLastX = t.clientX;
         this._lookLastY = t.clientY;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) this._lookMoved = true;
-        this.game.player?.applyMouseLook(dx * this._lookSensitivity, dy * this._lookSensitivity, 0.0025);
+        const dyAdj = settings.get('invertY') ? -dy : dy;
+        this.game.player?.applyMouseLook(dx * this._lookSensitivity, dyAdj * this._lookSensitivity, 0.0025);
       }
       e.preventDefault();
     }, { passive: false });

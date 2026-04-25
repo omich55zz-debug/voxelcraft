@@ -17,9 +17,10 @@ export class Menu {
     this.btnNew = document.getElementById('btn-new');
     this.btnLoad = document.getElementById('btn-load');
     this.btnResume = document.getElementById('btn-resume');
+    this.btnSettings = document.getElementById('btn-settings');
     this.seedInput = document.getElementById('seed-input');
     this.selectedMode = 'creative';
-    this.callbacks = { onStart: null, onLoad: null, onResume: null };
+    this.callbacks = { onStart: null, onLoad: null, onResume: null, onSettings: null };
     this._wire();
     this.refreshLoadButton();
   }
@@ -46,6 +47,9 @@ export class Menu {
     });
     this.btnResume.addEventListener('click', () => {
       this.callbacks.onResume?.();
+    });
+    this.btnSettings?.addEventListener('click', () => {
+      this.callbacks.onSettings?.();
     });
   }
 

@@ -24,10 +24,13 @@
       <!-- HUD -->
       <div id="hud" class="hidden">
         <div id="status-bar">
-          <div id="health-bar" class="stat-bar"><span class="label">HP</span><div class="fill"></div></div>
-          <div id="hunger-bar" class="stat-bar"><span class="label">FOOD</span><div class="fill"></div></div>
-          <div id="mode-indicator">CREATIVE</div>
-          <div id="time-indicator">12:00</div>
+          <div id="mode-pill"><span class="ico">⚒</span><span class="txt">CREATIVE</span></div>
+          <div id="time-pill"><span class="ico">☀</span><span class="txt">12:00</span></div>
+          <div id="fps-pill" class="hidden"><span class="ico">⏱</span><span class="txt">60</span></div>
+        </div>
+        <div id="vitals">
+          <div id="hearts" class="vital-row" aria-label="Здоровье"></div>
+          <div id="hunger" class="vital-row" aria-label="Голод"></div>
         </div>
         <div id="hotbar"></div>
         <div id="hint-box"></div>
@@ -92,6 +95,7 @@
               <button id="btn-new">Новый мир</button>
               <button id="btn-load">Загрузить</button>
               <button id="btn-resume" class="hidden">Продолжить</button>
+              <button id="btn-settings" class="ghost">Настройки</button>
             </div>
             <label class="seed-label">Seed: <input type="number" id="seed-input" value="1337" /></label>
           </div>
@@ -106,6 +110,75 @@
               <li><b>R</b> — взаимодействовать (рычаг, сундук, NPC, портал)</li>
               <li><b>Touch:</b> джойстик слева, свайп справа — камера, ⛏ — копать, ▣ — поставить, ▲ — прыжок, F — полёт</li>
             </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div id="settings" class="hidden">
+        <div class="menu-card settings-card">
+          <h2>Настройки</h2>
+          <div class="settings-section">
+            <h3>Графика</h3>
+            <label class="set-row">
+              <span class="set-label">Поле зрения (FOV)</span>
+              <input type="range" id="set-fov" min="50" max="100" step="1" />
+              <output id="out-fov"></output>
+            </label>
+            <label class="set-row">
+              <span class="set-label">Дальность прорисовки</span>
+              <input type="range" id="set-rd" min="3" max="12" step="1" />
+              <output id="out-rd"></output>
+            </label>
+            <label class="set-row">
+              <input type="checkbox" id="set-fps" />
+              <span>Показывать FPS</span>
+            </label>
+          </div>
+          <div class="settings-section">
+            <h3>Управление</h3>
+            <label class="set-row">
+              <span class="set-label">Чувствительность мыши</span>
+              <input type="range" id="set-mouse" min="0.2" max="3.0" step="0.1" />
+              <output id="out-mouse"></output>
+            </label>
+            <label class="set-row">
+              <input type="checkbox" id="set-invert-y" />
+              <span>Инвертировать Y</span>
+            </label>
+            <label class="set-row">
+              <span class="set-label">Чувствительность тача</span>
+              <input type="range" id="set-touch" min="0.5" max="6.0" step="0.1" />
+              <output id="out-touch"></output>
+            </label>
+            <label class="set-row">
+              <span class="set-label">Размер кнопок (тач)</span>
+              <input type="range" id="set-touch-size" min="0.7" max="1.4" step="0.05" />
+              <output id="out-touch-size"></output>
+            </label>
+          </div>
+          <div class="settings-section">
+            <h3>Интерфейс</h3>
+            <label class="set-row">
+              <input type="checkbox" id="set-show-hud" />
+              <span>Показывать HUD</span>
+            </label>
+            <label class="set-row">
+              <input type="checkbox" id="set-show-crosshair" />
+              <span>Показывать прицел</span>
+            </label>
+          </div>
+          <div class="settings-section">
+            <h3>Звук</h3>
+            <label class="set-row">
+              <span class="set-label">Громкость</span>
+              <input type="range" id="set-volume" min="0" max="1" step="0.05" />
+              <output id="out-volume"></output>
+            </label>
+          </div>
+          <div class="settings-actions">
+            <button id="set-reset" class="ghost">Сбросить</button>
+            <button id="set-close">Закрыть</button>
           </div>
         </div>
       </div>

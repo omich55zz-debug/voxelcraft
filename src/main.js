@@ -4,6 +4,7 @@ import { Menu } from './ui/menu.js';
 import { Inventory } from './game/inventory.js';
 import { hasSave, loadGame } from './game/save.js';
 import { TouchControls, isTouchDevice } from './ui/touch.js';
+import { SettingsPanel } from './ui/settings-panel.js';
 
 const canvas = document.getElementById('game-canvas');
 const inv = new Inventory(true);
@@ -11,6 +12,8 @@ const hud = new Hud(inv);
 const menu = new Menu();
 const game = new Game(canvas, hud);
 const touch = new TouchControls(game);
+const settingsPanel = new SettingsPanel();
+menu.on('onSettings', () => settingsPanel.show());
 
 game.start();
 
