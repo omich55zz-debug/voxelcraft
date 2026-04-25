@@ -2,9 +2,16 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1a2a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VoxelCraft" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>VoxelCraft — 3D песочница</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%237cba3a'/%3E%3Crect width='32' height='10' y='22' fill='%238b5a2b'/%3E%3C/svg%3E" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="stylesheet" href="/src/ui/styles.css" />
   </head>
   <body>
@@ -33,6 +40,23 @@
         <div id="dialog-toast" class="hidden"></div>
       </div>
 
+      <!-- Touch controls (mobile/Android) -->
+      <div id="touch" class="hidden">
+        <div class="look-area"></div>
+        <div class="joy-base"><div class="joy-knob"></div></div>
+        <div class="touch-buttons">
+          <button id="btn-jump" class="touch-btn">▲</button>
+          <button id="btn-crouch" class="touch-btn">▼</button>
+          <button id="btn-fly" class="touch-btn">F</button>
+          <button id="btn-sprint" class="touch-btn">»</button>
+          <button id="btn-dig" class="touch-btn primary">⛏</button>
+          <button id="btn-place" class="touch-btn primary">▣</button>
+          <button id="btn-r" class="touch-btn">R</button>
+          <button id="btn-inv" class="touch-btn">≡</button>
+          <button id="btn-pause" class="touch-btn">II</button>
+        </div>
+      </div>
+
       <!-- Chest UI -->
       <div id="chest" class="hidden">
         <h2>Сундук</h2>
@@ -51,7 +75,7 @@
       <div id="menu">
         <div class="menu-card">
           <h1>VoxelCraft</h1>
-          <p class="subtitle">3D песочница на Three.js</p>
+          <p class="subtitle">3D песочница на Three.js — играй на ПК и Android</p>
           <div class="menu-section">
             <h3>Режим игры</h3>
             <div class="mode-buttons">
@@ -80,7 +104,7 @@
               <li><b>Колесо мыши / 1-9</b> — выбор блока в хотбаре</li>
               <li><b>E</b> — инвентарь, <b>Esc</b> — меню паузы, <b>F</b> — переключить полёт</li>
               <li><b>R</b> — взаимодействовать (рычаг, сундук, NPC, портал)</li>
-              <li><b>Кирка/Топор/Лопата/Меч</b> — слоты 1-3 хотбара. Меч атакует мобов.</li>
+              <li><b>Touch:</b> джойстик слева, свайп справа — камера, ⛏ — копать, ▣ — поставить, ▲ — прыжок, F — полёт</li>
             </ul>
           </div>
         </div>
@@ -100,5 +124,13 @@
     </div>
 
     <script type="module" src="/src/main.js"></script>
+    <script>
+      // PWA: register service worker for offline play.
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

@@ -1,8 +1,25 @@
 // HUD updates: hotbar slots, status bars, hint text, inventory panel,
 // chest UI, NPC dialog toast, quest panel.
 
-import { blockName, PALETTE } from '../engine/blocks.js';
+import { blockName, PALETTE, isTool, toolKind } from '../engine/blocks.js';
 import { blockSwatch } from '../engine/textures.js';
+import { TOOL_ICON_DRAWERS } from '../game/viewmodel.js';
+
+// Pre-render tool icon sprites as data URLs so the hotbar swatches can show
+// the same pixel art that's in the player's hand.
+const TOOL_ICON_URLS = {};
+function getToolIconUrl(toolName) {
+  if (TOOL_ICON_URLS[toolName]) return TOOL_ICON_URLS[toolName];
+  const drawer = TOOL_ICON_DRAWERS[toolName];
+  if (!drawer) return null;
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 16;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  drawer(ctx);
+  TOOL_ICON_URLS[toolName] = c.toDataURL('image/png');
+  return TOOL_ICON_URLS[toolName];
+}
 
 export class Hud {
   constructor(inventory) {
@@ -80,7 +97,17 @@ export class Hud {
       el.classList.toggle('active', i === this.inventory.selected);
       const blockId = this.inventory.hotbar[i];
       const sw = el.querySelector('.swatch');
-      sw.style.background = blockSwatch(blockId);
+      if (isTool(blockId)) {
+        const url = getToolIconUrl(toolKind(blockId));
+        if (url) {
+          sw.style.background = `${blockSwatch(blockId)} url(${url}) center center / 80% 80% no-repeat`;
+          sw.style.imageRendering = 'pixelated';
+        } else {
+          sw.style.background = blockSwatch(blockId);
+        }
+      } else {
+        sw.style.background = blockSwatch(blockId);
+      }
       el.querySelector('.name').textContent = blockName(blockId);
       const c = this.inventory.countOf(blockId);
       el.querySelector('.count').textContent = (c === Infinity ? '' : (c > 0 ? c : ''));

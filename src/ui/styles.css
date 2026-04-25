@@ -459,3 +459,117 @@ button.selected, .mode-btn.selected {
   max-width: 600px;
   text-align: center;
 }
+
+/* ---------- Touch / Android controls ---------- */
+#touch {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+#touch.hidden { display: none; }
+
+#touch .look-area {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 60%;
+  height: 100%;
+  pointer-events: auto;
+  background: transparent;
+}
+
+#touch .joy-base {
+  position: absolute;
+  left: 28px;
+  bottom: 30px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: rgba(20, 20, 30, 0.32);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  touch-action: none;
+}
+#touch .joy-knob {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(220, 220, 230, 0.85);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  transition: transform 0.04s linear;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+
+#touch .touch-buttons {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(3, 64px);
+  gap: 8px;
+  pointer-events: auto;
+}
+#touch .touch-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(20, 20, 30, 0.45);
+  color: #fff;
+  font-size: 22px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  font-family: inherit;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+}
+#touch .touch-btn.primary {
+  background: rgba(60, 110, 200, 0.7);
+  border-color: rgba(180, 220, 255, 0.7);
+  font-size: 24px;
+}
+#touch .touch-btn.pressed {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.5);
+  color: #111;
+}
+
+/* Layout the buttons within the 3x3 grid. */
+#touch #btn-fly    { grid-column: 1; grid-row: 1; }
+#touch #btn-jump   { grid-column: 3; grid-row: 1; }
+#touch #btn-sprint { grid-column: 2; grid-row: 1; }
+#touch #btn-dig    { grid-column: 1; grid-row: 2; }
+#touch #btn-place  { grid-column: 3; grid-row: 2; }
+#touch #btn-crouch { grid-column: 2; grid-row: 3; }
+#touch #btn-r      { grid-column: 1; grid-row: 3; }
+#touch #btn-inv    { grid-column: 3; grid-row: 3; }
+#touch #btn-pause  { grid-column: 2; grid-row: 2; }
+
+/* Mobile-friendly HUD adjustments. */
+@media (pointer: coarse), (max-width: 900px) {
+  #status-bar { font-size: 12px; gap: 8px; padding: 4px 6px; }
+  #hotbar { transform: translateX(-50%) scale(0.95); bottom: 6px; }
+  #quest-panel { font-size: 12px; max-width: 220px; padding: 8px 10px; }
+  #hint-box { font-size: 12px; max-width: 70vw; }
+  .menu-card { max-width: 96vw; padding: 16px; }
+}
+
+/* PWA / fullscreen safe areas. */
+@supports (padding: max(0px)) {
+  #touch .joy-base { left: max(28px, env(safe-area-inset-left, 0)); }
+  #touch .touch-buttons { right: max(18px, env(safe-area-inset-right, 0)); }
+}

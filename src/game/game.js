@@ -17,6 +17,7 @@ import { Zombie, Villager } from './mobs.js';
 import { saveGame } from './save.js';
 import { EducationState } from './education.js';
 import { QuestTracker } from './quests.js';
+import { ViewModel } from './viewmodel.js';
 
 const PLACE_DELAY = 180; // ms between placements when holding RMB
 
@@ -70,6 +71,9 @@ export class Game {
     this.quests = null;
     this.villagers = [];
     this.openChestPos = null;
+    // Add the camera to the scene so children (held-item viewmodel) render.
+    this.scene.add(this.camera);
+    this.viewModel = new ViewModel(this.camera, this.opaqueMaterial);
 
     this.chunkMeshes = new Map(); // key -> { opaque, transparent }
 
@@ -134,28 +138,33 @@ export class Game {
     }
     this.quests = new QuestTracker();
     this.timeOfDay = 0.35;
-    // Spawn at the world center, on the ground.
-    const sx = (CHUNK_SIZE * WORLD_CHUNKS_X) / 2 + 0.5;
-    const sz = (CHUNK_SIZE * WORLD_CHUNKS_Z) / 2 + 0.5;
-    let sy = 60;
-    for (let y = 60; y >= 1; y--) {
-      const id = this.world.getBlock(Math.floor(sx), y, Math.floor(sz));
-      if (id !== BLOCK.AIR && id !== BLOCK.WATER) { sy = y + 1; break; }
-    }
-    this.player.position.set(sx, sy, sz);
-    if (this.education) {
-      this.education.startPos.copy(this.player.position);
-      this.education.startYaw = this.player.yaw;
-    }
-    // Generate a starting village in the normal overworld.
+    // Generate a starting village in the normal overworld first, so we can
+    // place the spawn just outside it on a clear patch.
+    const cx = (CHUNK_SIZE * WORLD_CHUNKS_X) / 2;
+    const cz = (CHUNK_SIZE * WORLD_CHUNKS_Z) / 2;
     if (flavor === 'normal') {
-      const spots = this.world.generateVillage(Math.floor(sx), Math.floor(sz));
+      const spots = this.world.generateVillage(cx, cz);
       this.world.villagerSpots = spots;
       for (const s of spots) {
         const v = new Villager(this.world, s.x, s.y, s.z, s.name);
         this.villagers.push(v);
         this.mobGroup.add(v.group);
       }
+    }
+    // Spawn ~16 blocks south of the village center, looking north toward it.
+    const spawnOffset = (flavor === 'normal') ? 16 : 0;
+    const sx = cx + 0.5;
+    const sz = cz + spawnOffset + 0.5;
+    let sy = 60;
+    for (let y = 60; y >= 1; y--) {
+      const id = this.world.getBlock(Math.floor(sx), y, Math.floor(sz));
+      if (id !== BLOCK.AIR && id !== BLOCK.WATER) { sy = y + 1; break; }
+    }
+    this.player.position.set(sx, sy, sz);
+    this.player.yaw = Math.PI; // face -z (north toward village)
+    if (this.education) {
+      this.education.startPos.copy(this.player.position);
+      this.education.startYaw = this.player.yaw;
     }
     this.regenAllChunks();
     this.hud.setQuest(this.quests.active(), this.quests.completedCount(), this.quests.totalCount());
@@ -289,9 +298,15 @@ export class Game {
         this.canvas.requestPointerLock?.();
         return;
       }
-      if (e.button === 0) this.mouseButtons.left = true;
-      if (e.button === 2) this.mouseButtons.right = true;
-      if (e.button === 2) this.tryPlace();
+      if (e.button === 0) {
+        this.mouseButtons.left = true;
+        this.viewModel?.triggerSwing();
+      }
+      if (e.button === 2) {
+        this.mouseButtons.right = true;
+        this.viewModel?.triggerSwing();
+        this.tryPlace();
+      }
     });
     addEventListener('mouseup', (e) => {
       if (e.button === 0) this.mouseButtons.left = false;
@@ -720,6 +735,10 @@ export class Game {
       this.education?.update(this.player, this.world);
       const hint = this.education?.current()?.text ?? null;
       this.hud.setHint(hint);
+      // Held viewmodel.
+      this.viewModel.setHeld(this.inventory.selectedBlock());
+      const walkSpeed = Math.hypot(this.player.velocity.x, this.player.velocity.z);
+      this.viewModel.update(dt, walkSpeed);
       this.hud.refresh(this.player, this.timeOfDay);
       this.renderer.render(this.scene, this.camera);
     };
