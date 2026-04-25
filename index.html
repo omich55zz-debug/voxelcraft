@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VoxelCraft — 3D песочница</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%237cba3a'/%3E%3Crect width='32' height='10' y='22' fill='%238b5a2b'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/ui/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Crosshair -->
+      <div id="crosshair"></div>
+
+      <!-- HUD -->
+      <div id="hud" class="hidden">
+        <div id="status-bar">
+          <div id="health-bar" class="stat-bar"><span class="label">HP</span><div class="fill"></div></div>
+          <div id="hunger-bar" class="stat-bar"><span class="label">FOOD</span><div class="fill"></div></div>
+          <div id="mode-indicator">CREATIVE</div>
+          <div id="time-indicator">12:00</div>
+        </div>
+        <div id="hotbar"></div>
+        <div id="hint-box"></div>
+      </div>
+
+      <!-- Inventory -->
+      <div id="inventory" class="hidden">
+        <h2>Инвентарь / Палитра блоков</h2>
+        <div id="inventory-grid"></div>
+        <div class="inventory-hint">E — закрыть. Клик — выбрать блок в активный слот.</div>
+      </div>
+
+      <!-- Pause / Main menu -->
+      <div id="menu">
+        <div class="menu-card">
+          <h1>VoxelCraft</h1>
+          <p class="subtitle">3D песочница на Three.js</p>
+          <div class="menu-section">
+            <h3>Режим игры</h3>
+            <div class="mode-buttons">
+              <button data-mode="creative" class="mode-btn selected">Творчество</button>
+              <button data-mode="survival" class="mode-btn">Выживание</button>
+              <button data-mode="education" class="mode-btn">Образование</button>
+            </div>
+            <p id="mode-description">Бесконечные ресурсы, полёт, без врагов. Идеально для строительства.</p>
+          </div>
+          <div class="menu-section">
+            <h3>Мир</h3>
+            <div class="world-buttons">
+              <button id="btn-new">Новый мир</button>
+              <button id="btn-load">Загрузить</button>
+              <button id="btn-resume" class="hidden">Продолжить</button>
+            </div>
+            <label class="seed-label">Seed: <input type="number" id="seed-input" value="1337" /></label>
+          </div>
+          <div class="menu-section controls-help">
+            <h3>Управление</h3>
+            <ul>
+              <li><b>WASD</b> — движение, <b>Пробел</b> — прыжок (двойной — полёт в творчестве)</li>
+              <li><b>Shift</b> — присесть / снижение в полёте, <b>Ctrl</b> — спринт</li>
+              <li><b>ЛКМ</b> — сломать блок, <b>ПКМ</b> — поставить</li>
+              <li><b>Колесо мыши / 1-9</b> — выбор блока в хотбаре</li>
+              <li><b>E</b> — инвентарь, <b>Esc</b> — меню паузы, <b>F</b> — переключить полёт</li>
+              <li><b>R</b> — взаимодействовать (рычаг/кнопка для редстоуна)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="loading" class="hidden">
+        <div class="spinner"></div>
+        <p>Генерация мира…</p>
+      </div>
+
+      <!-- Death overlay -->
+      <div id="death" class="hidden">
+        <h2>Вы погибли</h2>
+        <button id="btn-respawn">Возродиться</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
